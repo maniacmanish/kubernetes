@@ -1,0 +1,112 @@
+apt install inetutils-traceroute
+apt install traceroute
+
+dpkg-reconfigure cloud-init
+
+sudo apt-get purge cloud-init
+
+sudo apt-get remove cloud-init
+
+sudo touch /etc/cloud/cloud-init.disabled
+
+sudo mv /etc/cloud/ ~/; sudo mv /var/lib/cloud/ ~/cloud-lib
+I prefer to move, rather than delete, in case something goes wrong and you wish to restore the files.
+
+--
+
+
+# /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg with the following:
+# network: {config: disabled}
+
+# vi /etc/netplan/50-cloud-init.yaml
+
+network:
+    ethernets:
+        ens33:
+            nameservers:
+                    addresses: [8.8.8.8, 8.8.4.4]
+            addresses: [192.168.63.70/2]
+            gateway4: 192.168.63.1
+            dhcp4: false
+    version: 2
+
+#	netplan apply
+
+# systemd-resolve --status | grep 'DNS Servers' -A2
+
+# sudo vi /etc/cloud/cloud.cfg
+# This will cause the set+update hostname module to not operate (if true)
+preserve_hostname: true
+
+# hostnamectl
+# sudo hostnamectl set-hostname linuxize
+# vi /etc/hosts
+
+
+--
+
+1. Initializes cluster master node:
+
+ kubeadm init --apiserver-advertise-address $(hostname -i)
+
+
+ 2. Initialize cluster networking:
+
+ kubectl apply -n kube-system -f \
+    "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 |tr -d '\n')"
+
+
+ 3. (Optional) Create an nginx deployment:
+
+ kubectl apply -f https://raw.githubusercontent.com/kubernetes/website/master/content/en/examples/application/nginx-app.yaml
+
+
+                          The PWK team.
+						  
+---
+
+
+Last login: Sat Nov  9 07:32:37 2019
+gtsteam@kubemaster:~$ sudo -i
+[sudo] password for gtsteam:
+root@kubemaster:~# swapoff -a
+root@kubemaster:~# vi /etc/fstab
+root@kubemaster:~# vi /etc/ufw/sysctl.conf
+root@kubemaster:~# reboot
+
+root@kubemaster:~# apt-get install ebtables ethtool
+
+
+systemctl enable docker.service
+
+root@kubemaster:~# kubeadm config images pull
+[config/images] Pulled k8s.gcr.io/kube-apiserver:v1.16.2
+[config/images] Pulled k8s.gcr.io/kube-controller-manager:v1.16.2
+[config/images] Pulled k8s.gcr.io/kube-scheduler:v1.16.2
+[config/images] Pulled k8s.gcr.io/kube-proxy:v1.16.2
+[config/images] Pulled k8s.gcr.io/pause:3.1
+[config/images] Pulled k8s.gcr.io/etcd:3.3.15-0
+[config/images] Pulled k8s.gcr.io/coredns:1.6.2
+
+
+
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+  
+  lsb_release -a
+apt-get install software-properties-common chrony vim
+apt-add-repository cloud-archive:liberty
+apt-get update -y
+apt-get dist-upgrade
+
+
+  
