@@ -1,0 +1,199 @@
+Kubernetes Master Node – (Hostname: k8s-master , IP : 192.168.1.70, OS : Minimal Ubuntu 18.04 LTS)
+Kubernetes Slave Node 1 – (Hostname: k8s-worker-node1, IP: 192.168.1.80 , OS : Minimal Ubuntu 18.04 LTS)
+Kubernetes Slave Node 2 – (Hostname: k8s-worker-node2, IP: 192.168.1.90 , OS : Minimal Ubuntu 18.04 LTS)
+
+192.168.1.70     k8s-master
+192.168.1.80     k8s-worker-node1
+192.168.1.90     k8s-worker-node2
+
+sudo apt-get update && sudo apt-get upgrade
+sudo apt install docker.io
+systemctl start docker
+systemctl enable docker
+systemctl status docker
+$ sudo apt-get install apt-transport-https ca-certificates curl software-properties-common keepalived
+apt-get install apt-transport-https curl -y
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
+apt-add-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
+apt install kubeadm
+swapoff -a
+hostnamectl set-hostname master-node
+exec bash
+kubeadm init --pod-network-cidr=10.244.0.0/16
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+kubectl get pods --all-namespaces
+kubectl get nodes
+
+network:
+
+version: 2
+renderer: networkd
+ethernets:
+ens33:
+dhcp4: no
+addresses: [192.168.101.21/24]
+gateway4: 192.168.101.2
+nameservers:
+addresses: [192.168.101.2,8.8.8.8]
+
+Protocol & port range	Source									Purpose						Direction
+TCP 443					Worker nodes, end-users, API requests	Kubernetes API Server		Master node inbound
+TCP 10250				Master nodes							Worker node Kubelet health check port				Worker node inbound
+TCP 30000-32767			External application clients			Default port range for providing external services	
+UDP 8285				Worker nodes							UDP backend of Flannel 								overlay network	
+UDP 8472				Worker nodes							VXLAN backend of Flannel 							overlay network	
+TCP 179					Worker nodes							Required only if Calico 							BGP network is used	
+TCP 2379-2380			Master nodes							etcd server client API								etcd node inbound
+TCP 2379-2380			Worker nodes							etcd server client API that is required if Flannel of Calico is used
+
+$ sudo vim /etc/hosts
+Add these lines to the hosts file:
+192.168.101.21 docker-nakivo21
+192.168.101.31 docker-nakivo31
+192.168.101.32 docker-nakivo32
+
+$ sudo apt-get install openssh-server
+$ ssh-keygen
+$ ssh-copy-id kubernetes-user@192.168.101.31
+
+$ sudo -i
+
+Edit the SSH server configuration file.
+# vim /etc/ssh/sshd_config
+Add/edit the following string to this file.
+PermitRootLogin yes
+
+Restart the SSH server daemon.
+# /etc/init.d/ssh stop
+# /etc/init.d/ssh start
+Set the root password (password for the root user).
+
+# passwd
+$ cd /home/kubernetes-user/
+$ sudo ssh-keygen -t rsa
+Copy the public key to be able to login remotely via SSH as root (the key is stored in the home directory of the regular user since the previous command was run from that directory).
+$ sudo ssh-copy-id -i /home/kubernetes-user/.ssh/id_rsa.pub 127.0.0.1
+If your key is saved into the home directory of the root user, copy the key with this command:
+# ssh-copy-id -i /root/.ssh/id_rsa.pub 127.0.0.1
+Confirm this operation and enter your password.
+Repeat the action, copying the key from each machine to other machines. For instance, on the docker-nakivo21 machine execute:
+# ssh-copy-id -i /root/.ssh/id_rsa.pub 192.168.101.31
+# ssh-copy-id -i /root/.ssh/id_rsa.pub 192.168.101.32
+
+Make the public key authorized.
+# cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
+Verify whether you can log in as root via SSH on the local machine.
+$ sudo ssh root@127.0.0.1
+Try to connect from/to the remote machine without entering a password.
+$ sudo ssh root@192.168.101.21
+$ sudo ssh root@192.168.101.31
+$ sudo ssh root@192.168.101.32
+
+
+systemctl enable keepalived && systemctl start keepalived
+
+Verify whether the value is 1 for correct functioning of Kubernetes installed on Ubuntu.
+# sysctl net.bridge.bridge-nf-call-iptables
+In order to set this value to 1 run the command:
+sysctl net.bridge.bridge-nf-call-iptables=1
+Edit the kubeadm configuration file.
+# vim /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+Add the string after the existing Environment string:
+Environment=”cgroup-driver=systemd/cgroup-driver=cgroupfs”
+
+ kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.101.21
+ 
+ kubectl get nodes
+ kubectl cluster-info
+ 
+ Control-plane node(s)
+Protocol	Direction	Port Range	Purpose	Used By
+TCP			Inbound		6443*		Kubernetes API server	All
+TCP			Inbound		2379-2380	etcd server client API	kube-apiserver, etcd
+TCP			Inbound		10250		Kubelet API	Self, Control plane
+TCP			Inbound		10251		kube-scheduler	Self
+TCP			Inbound		10252		kube-controller-manager	Self
+
+Protocol	Direction	Port Range	Purpose	Used By
+TCP	Inbound	10250		Kubelet API	Self, Control plane
+TCP	Inbound	30000-32767	NodePort Services**	All
+
+sudo apt-get update && sudo apt-get install -y apt-transport-https curl
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+cat <<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
+deb https://apt.kubernetes.io/ kubernetes-xenial main
+EOF
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+systemctl daemon-reload
+systemctl restart kubelet
+
+kubectl apply -f https://docs.projectcalico.org/v3.8/manifests/calico.yaml
+
+weave-Net
+
+/proc/sys/net/bridge/bridge-nf-call-iptables to 1 by running
+
+sysctl net.bridge.bridge-nf-call-iptables=1
+kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+kubectl taint nodes --all node-role.kubernetes.io/master-
+
+kubeadm token list
+
+If you don’t have the value of --discovery-token-ca-cert-hash, you can get it by running the following command chain on the control-plane node:
+
+openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | \
+   openssl dgst -sha256 -hex | sed 's/^.* //'
+   
+Tear down
+To undo what kubeadm did, you should first drain the node and make sure that the node is empty before shutting it down.
+
+Talking to the control-plane node with the appropriate credentials, run:
+
+kubectl drain <node name> --delete-local-data --force --ignore-daemonsets
+kubectl delete node <node name>
+Then, on the node being removed, reset all kubeadm installed state:
+
+kubeadm reset
+
+The reset process does not reset or clean up iptables rules or IPVS tables. If you wish to reset iptables, you must do so manually:
+
+iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
+
+If you want to reset the IPVS tables, you must run the following command:
+
+ipvsadm -C
+
+If you wish to start over simply run kubeadm init or kubeadm join with the appropriate arguments.
+
+usermod -aG sudo username
+su - username
+su whoami
+
+
+ssh-keygen -t rsa
+ssh-keygen -t rsa -b 4096
+.ssh/id_rsa 
+.ssh/id_rsa.pub
+head ~/.ssh/id_rsa
+ssh-copy-id remote-user@server-ip
+sudo nano /etc/ssh/sshd_config
+#PasswordAuthentication yes
+ChallengeResponseAuthentication no
+sudo service ssh restart
+sudo systemctl restart ssh
+
+Storing Key Passphrase in SSH Agent
+sudo apt install keychain
+/usr/bin/keychain $HOME/.ssh/id_rsa
+source $HOME/.keychain/$HOSTNAME-sh
+
+Changing Private Key Passphrase
+ssh-keygen -f ~/.ssh/id_rsa -p
